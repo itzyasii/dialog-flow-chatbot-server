@@ -15,6 +15,8 @@ import { logger } from "./utils/logger.mjs";
 import securityMiddleware from "./middleware/securityMiddleware.mjs";
 import { errorHandler } from "./middleware/errorMiddleware.mjs";
 import requestLogger from "./middleware/requestLogger.mjs";
+import chatRoutes from "./module/Chat/chat.route.mjs";
+import dialogflowRoutes from "./module/Dialogflow/dialogflow.route.mjs";
 
 // Services
 
@@ -50,6 +52,7 @@ app.get("/api/v1/health", (_req, res) => {
 });
 
 export const server = http.createServer(app);
+app.set("io", null);
 
 // ----------------------------------------------------------------------------
 // Static Assets
@@ -61,6 +64,9 @@ app.use(express.static(path.join(__dirname, "public")));
 // ----------------------------------------------------------------------------
 // Routes
 // ----------------------------------------------------------------------------
+
+app.use("/api/v1/chats", chatRoutes);
+app.use("/api/v1/dialogflow", dialogflowRoutes);
 
 // ----------------------------------------------------------------------------
 // Error Handling

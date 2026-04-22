@@ -1,9 +1,11 @@
 import { logger } from "../../utils/logger.mjs";
 import { getCtx } from "../../utils/context.mjs";
+import {
+  roomHandler,
+  singleChatHandler,
+} from "./chatHandler.mjs";
 
-const SOCKET_ERROR_EVENT = "socket:error"; // prefer a namespaced error event
-
-// Track registrations per socket to avoid double-binding listeners
+const SOCKET_ERROR_EVENT = "socket:error";
 const REGISTERED = Symbol("handlers_registered");
 
 const safeEmitInitError = (socket, err, meta = {}) => {
@@ -41,7 +43,6 @@ const runSafely = async ({ name, fn, socket }) => {
 };
 
 export const registerSocketHandler = async (io, socket, onlineUsers) => {
-  // Prevent double-registration
   if (socket[REGISTERED]) {
     logger.warn({
       event: "SOCKET_HANDLER_ALREADY_REGISTERED",
@@ -53,16 +54,19 @@ export const registerSocketHandler = async (io, socket, onlineUsers) => {
   }
   socket[REGISTERED] = true;
 
-  // Register event listeners
   const registrations = [
     { name: "roomHandler", fn: () => roomHandler(io, socket, onlineUsers) },
+    { name: "singleChatHandler", fn: () => singleChatHandler(io, socket) },
   ];
 
   const results = await Promise.all(
-    registrations.map((h) => runSafely({ name: h.name, fn: h.fn, socket })),
+    registrations.map((handler) =>
+      runSafely({ name: handler.name, fn: handler.fn, socket }),
+    ),
   );
 
-  const failed = results.filter((r) => !r.ok).map((r) => r.name);
+  const failed = results.filter((result) => !result.ok).map((result) => result.name);
+
   if (failed.length) {
     logger.warn({
       event: "SOCKET_HANDLER_REGISTRATION_PARTIAL",
@@ -74,12 +78,11 @@ export const registerSocketHandler = async (io, socket, onlineUsers) => {
     });
   }
 
-  // Optional: log success state
   logger.info({
     event: "SOCKET_HANDLERS_REGISTERED",
     socketId: socket?.id,
     userId: socket?.user,
-    registered: results.filter((r) => r.ok).map((r) => r.name),
+    registered: results.filter((result) => result.ok).map((result) => result.name),
     failed,
     ...getCtx(),
   });
