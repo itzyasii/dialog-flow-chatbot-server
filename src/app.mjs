@@ -17,6 +17,7 @@ import { errorHandler } from "./middleware/errorMiddleware.mjs";
 import requestLogger from "./middleware/requestLogger.mjs";
 import chatRoutes from "./module/Chat/chat.route.mjs";
 import dialogflowRoutes from "./module/Dialogflow/dialogflow.route.mjs";
+import sessionRoutes from "./module/Session/session.route.mjs";
 
 // Services
 
@@ -67,6 +68,7 @@ app.use(express.static(path.join(__dirname, "public")));
 
 app.use("/api/v1/chats", chatRoutes);
 app.use("/api/v1/dialogflow", dialogflowRoutes);
+app.use("/api/v1/session", sessionRoutes);
 
 // ----------------------------------------------------------------------------
 // Error Handling

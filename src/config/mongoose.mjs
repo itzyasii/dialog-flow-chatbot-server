@@ -8,6 +8,12 @@ export async function initMongoose() {
   mongoose.set("strictQuery", true);
 
   try {
+    if (!env.MONGO_URI) {
+      throw new Error(
+        "MongoDB connection string is missing. Set MONGO_URI or MONGODB_URI in your .env file.",
+      );
+    }
+
     await mongoose.connect(env.MONGO_URI, {
       autoIndex: env.NODE_ENV === "development" ? true : false,
       serverSelectionTimeoutMS: 5000,
