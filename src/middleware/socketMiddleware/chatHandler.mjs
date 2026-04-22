@@ -7,6 +7,10 @@ import {
   appendChatMessage,
   getOrCreateDirectChat,
 } from "../../module/Chat/chat.service.mjs";
+import {
+  detectDialogflowIntent,
+  isDialogflowConfigured,
+} from "../../module/Dialogflow/dialogflow.service.mjs";
 
 export const SOCKET_EVENTS = {
   ERROR: "socket:error",
@@ -123,6 +127,61 @@ export const singleChatHandler = async (io, socket) => {
 
       if (typeof ack === "function") {
         ack({ ok: true, data: response });
+      }
+
+      if (isDialogflowConfigured()) {
+        try {
+          const dialogflowResult = await detectDialogflowIntent({
+            clientUserId: userId,
+            sessionId: result.sessionId,
+            text: parsedPayload.text,
+            profile: parsedPayload.profile,
+          });
+
+          // For webhook-enabled intents, the webhook route stores and emits the
+          // bot message. For regular intents, persist the detectIntent text here.
+          if (dialogflowResult.webhookSource !== "dialogflow-webhook") {
+            const botResult = await appendChatMessage({
+              clientExternalId: userId,
+              senderRole: "server",
+              text: dialogflowResult.fallbackText,
+              source: "api",
+              sessionId: result.sessionId,
+              dialogflow: {
+                intent: dialogflowResult.intent,
+                action: dialogflowResult.action,
+                confidence: dialogflowResult.confidence,
+                responseId: dialogflowResult.responseId,
+                session: result.sessionId,
+              },
+              metadata: {
+                parameters: dialogflowResult.parameters,
+                webhookStatus: dialogflowResult.webhookStatus,
+              },
+            });
+
+            emitChatMessageToUser(io, userId, {
+              chatId: botResult.chat.id,
+              sessionId: botResult.sessionId,
+              message: botResult.message,
+            });
+          }
+        } catch (dialogflowError) {
+          logger.error({
+            event: "socket_dialogflow_followup_failed",
+            message: dialogflowError.message,
+            stack: dialogflowError.stack,
+            socketId: socket.id,
+            userId,
+            ...getCtx(),
+          });
+
+          socket.emit(SOCKET_EVENTS.ERROR, {
+            event: "dialogflow:detect-intent",
+            message: dialogflowError.message || "Dialogflow request failed",
+            code: "DIALOGFLOW_DETECT_INTENT_FAILED",
+          });
+        }
       }
     } catch (error) {
       emitSocketError(socket, SOCKET_EVENTS.CHAT_MESSAGE_SEND, error);

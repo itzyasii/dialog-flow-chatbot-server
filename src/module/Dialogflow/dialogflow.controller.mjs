@@ -37,6 +37,7 @@ export const dialogflowWebhookController = async (req, res, next) => {
     });
 
     return res.status(200).json({
+      source: "dialogflow-webhook",
       fulfillmentText: reply.text,
       fulfillmentMessages: [
         {
